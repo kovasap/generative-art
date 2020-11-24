@@ -11,27 +11,51 @@
 (def w 1080)
 (def h 1080)
 
-(def max-v 0.5)
+(def max-starting-velocity 0.5)
+(def max-force 10)
+
+(defn distance
+  "Distance between two points encoded as maps with :x and :y keys."
+  [p1 p2]
+  (Math/sqrt (+ (Math/pow (- (:x p1) (:x p2)) 2)
+                (Math/pow (- (:y p1) (:y p2)) 2))))
+
+(def particle-consts {
+   :halogen {:force (fn [self other] 
+                    (let [dist (distance self other)
+                          repulsive (/ 10 (Math/pow dist 2))
+                          attractive (/ 10 dist)]
+                         (min (- repulsive attractive) max-force)))
+             :size 5
+             :mass 10 }
+   :metal {:force (fn [self other] 
+                    (let [dist (distance self other)
+                          repulsive (/ 10 (Math/pow dist 2))
+                          attractive (/ 10 dist)]
+                         (min (- repulsive attractive) max-force)))
+             :size 10
+             :mass 1000 }
+})
 
 (defn particle
   "Creates a particle map."
-  [id x y]
-  {:id         id
-   :vx         (q/random (- max-v) max-v)
-   :vy         (q/random (- max-v) max-v)
-   :size       10
-   :direction  0
-   :x          (q/random w)
-   :y          (q/random h)
-   ; Mass
-   :m          10
-   :color      (rand-nth (:colors (:purple-haze c/palettes)))})
+  [element id]
+  (assoc element
+         :id         id
+         :vx         (q/random (- max-starting-velocity) max-starting-velocity)
+         :vy         (q/random (- max-starting-velocity) max-starting-velocity)
+         :direction  0
+         :x          (q/random w)
+         :y          (q/random h)
+         :color      (rand-nth (:colors (:purple-haze c/palettes)))))
 
 
 (defn sketch-setup 
   "Returns the initial state to use for the update-render loop."
   []
-  {:particles (map particle (range 0 100))
+  {:particles (concat
+                (map (partial particle (:halogen particle-consts)) (range 0 100))
+                (map (partial particle (:metal particle-consts)) (range 0 10)))
    :step 0})
 
 
@@ -42,29 +66,12 @@
          :x (f (:x xy))
          :y (f (:y xy))))
 
-
-(defn distance
-  "Distance between two points encoded as maps with :x and :y keys."
-  [p1 p2]
-  (Math/sqrt (+ (Math/pow (- (:x p1) (:x p2)) 2)
-                (Math/pow (- (:y p1) (:y p2)) 2))))
-
 (defn unit-vector
   "Unit vector pointing from the source point to the target point."
   [source target dist]
   {:x (/ (- (:x target) (:x source)) dist)
    :y (/ (- (:y target) (:y source)) dist)})
 
-(def attractive-force-constant 100)
-(def repulsive-force-constant 10)
-(def max-force 10)
-
-(defn force-magnitude
-  "Magnitude of the force on a particle"
-  [dist]
-  (def repulsive (/ repulsive-force-constant (Math/pow dist 2)))
-  (def attractive (/ attractive-force-constant dist))
-  (min (- repulsive attractive) max-force))
 
 (defn single-source-force
   "Force on target particle from the source particle."
@@ -73,7 +80,7 @@
     ; Have particles exert 0 force on themselves.
     {:x 0 :y 0}
     (let [dist (distance source target)
-          force-mag (force-magnitude dist)
+          force-mag ((:force source) source target)
           unit-vec (unit-vector source target dist)]
       {:x (* (:x unit-vec) force-mag) 
        :y (* (:y unit-vec) force-mag)})))
@@ -108,7 +115,7 @@
                      ; -> dv = F * dt / m
                      (def dv (apply-to-xy
                                (global-force-on-particle p (:particles state))
-                               (fn [force-val] (/ force-val (:m p)))))
+                               (fn [force-val] (/ force-val (:mass p)))))
                      ; (if (= (:id p) 1) (print dv))
                      (-> p
                        (update-velocities dv)
