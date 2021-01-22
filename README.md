@@ -14,3 +14,4 @@ https://github.com/tpope/vim-fireplace/issues/357
 https://github.com/weavejester/cljfmt
 https://github.com/tpope/vim-fireplace/
 https://github.com/venantius/vim-cljfmt
+https://github.com/yogthos/quil-reagent-demo
